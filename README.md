@@ -1,4 +1,4 @@
-# Project A — Batch Data Platform (in progress)
+# Batch Data Platform (in progress)
 
 A production-shaped **batch data platform** that turns raw data into **analytics-ready datasets** using:
 - landing zone (S3-style)
