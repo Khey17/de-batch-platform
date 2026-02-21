@@ -36,5 +36,12 @@ See: `docs/architecture.md`
 ## Milestones
 See: `docs/milestones.md`
 
-## Status
-MVP not implemented yet — repository scaffold + requirements + milestones are being defined first.
+## MVP Architecture
+
+### What the MVP delivers (user-facing)
+The MVP proves an end-to-end batch pipeline:
+- Land raw files into an S3-style **landing zone** (MinIO).
+- Orchestrate a repeatable workflow with **Airflow** (retries/backfills).
+- Transform + model into **analytics-ready** tables with **dbt** (staging → star schema).
+- Run **data quality checks** (dbt tests) on each run.
+- Persist **run_history** (status, duration, row counts, failure reason).
