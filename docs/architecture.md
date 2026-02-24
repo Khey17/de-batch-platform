@@ -14,27 +14,27 @@ flowchart LR
   end
 
   subgraph LZ[Landing Zone]
-    S3["MinIO (S3-compatible)\nraw/bronze storage"]
+    S3["MinIO (S3-compatible)<br/>raw/bronze storage"]
   end
 
   subgraph ORCH[Orchestration]
-    AF["Airflow DAGs\nschedule, retries, backfills"]
+    AF["Airflow DAGs<br/>schedule, retries, backfills"]
   end
 
   subgraph PROC[Processing + Modeling]
-    ETL["Batch ETL\n(Python / Spark jobs)"]
-    DBT["dbt\n(stg -> dim/fct + tests)"]
-    DQ["Data Quality\n(dbt tests / Great Expectations optional)"]
+    ETL["Batch ETL<br/>(Python / Spark jobs)"]
+    DBT["dbt<br/>(stg -> dim/fct + tests)"]
+    DQ["Data Quality<br/>(dbt tests / Great Expectations optional)"]
   end
 
   subgraph DATA[Data Stores]
-    WH["Postgres Warehouse\nraw_*, stg_*, dim_*, fct_*"]
-    META["Metadata DB\nrun_history, job_status, row_counts"]
+    WH["Postgres Warehouse<br/>raw_*, stg_*, dim_*, fct_*"]
+    META["Metadata DB<br/>run_history, job_status, row_counts"]
   end
 
   subgraph OBS[Observability]
     LOGS["Structured Logs"]
-    METRICS["Run Metrics\nduration, rows, failures"]
+    METRICS["Run Metrics<br/>duration, rows, failures"]
   end
 
   %% DATA PLANE (solid)
