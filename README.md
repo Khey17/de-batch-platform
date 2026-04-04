@@ -1,47 +1,69 @@
-# Batch Data Platform (in progress)
+# Batch Data Platform
 
-A production-shaped **batch data platform** that turns raw data into **analytics-ready datasets** using:
-- landing zone (S3-style)
-- orchestration (Airflow)
-- transformations + modeling (dbt star schema)
-- warehouse (Postgres/Redshift)
-- data quality checks + run history
+A production-shaped **batch ELT platform** that ingests raw source data, models it into an analytics-ready Gold layer, and delivers trusted datasets for downstream analytics and science consumers.
+
+Built on an AWS-native stack — S3, Lambda, Step Functions, Redshift Serverless, dbt, SNS, and CloudWatch. Infrastructure provisioned and torn down via Terraform.
 
 ---
 
-## Why this exists
-- pipeline reliability (retries, idempotency, backfills)
-- data modeling (dimensional/star schema)
-- testing and validation
-- observability (logs + run metrics)
-- engineering hygiene (CI + clean docs)
+## Stack
+
+| Layer | Tool |
+|---|---|
+| Landing zone | S3 (partitioned bronze storage) |
+| Orchestration | Step Functions |
+| Ingestion + ETL | Lambda (Python) |
+| Modeling | dbt |
+| Warehouse | RDS Postgres (Redshift-compatible DDL) |
+| Metadata | Glue Data Catalog |
+| Data quality | dbt tests + custom Python |
+| Alerting | SNS + CloudWatch |
+| Infrastructure | Terraform |
+| CI | GitHub Actions |
+
+---
+
+## Architecture
+
+See: `docs/architecture.md`
+
+---
+
+## Data Model (Gold Layer)
+
+Star schema designed for analytical query patterns:
+
+```
+fct_orders      — grain: one row per order
+dim_customer    — customer attributes
+dim_product     — product / listing attributes
+```
+
+Warehouse layer convention:
+- `raw_*` — landed as-is from source
+- `stg_*` — cleaned, typed, deduplicated
+- `dim_*` — dimension tables
+- `fct_*` — fact tables
 
 ---
 
 ## Definition of Done (MVP)
-- [ ] `docker compose up` starts the stack locally
-- [ ] Airflow DAG runs end-to-end
-- [ ] Raw data lands in an S3-style layout (partitioned paths)
-- [ ] Warehouse tables exist: `raw_*`, `stg_*`, `dim_*`, `fct_*`
-- [ ] dbt builds + tests pass
-- [ ] `run_history` captures run status + row counts + duration
-- [ ] CI runs lint/tests/dbt checks on every push
-- [ ] Demo assets exist: DAG screenshot + dbt lineage + query output
+
+- [ ] Terraform provisions all AWS resources in one command
+- [ ] Raw files land in S3 with partitioned paths (`raw/year=/month=/day=`)
+- [ ] Step Functions state machine runs: ingest → ETL → dbt → quality checks → run_history
+- [ ] Redshift DDL uses DISTKEY, SORTKEY, and compression encodings
+- [ ] dbt builds `stg_*` → `dim_*` → `fct_*` with tests passing
+- [ ] At least one data quality check fails a run and writes failure reason to `run_history`
+- [ ] `run_history` captures: status, row counts, duration, failure reason
+- [ ] SNS alert fires on pipeline failure
+- [ ] Structured logs from all pipeline stages visible in CloudWatch
+- [ ] CI runs dbt compile + lint on every push
+- [ ] `terraform destroy` tears everything down cleanly
+- [ ] Demo assets: pipeline run screenshot, dbt lineage graph, sample query output
 
 ---
 
-## Planned architecture (target)
-See: `docs/architecture.md`
-
 ## Milestones
+
 See: `docs/milestones.md`
-
-## MVP Architecture
-
-### What the MVP delivers (user-facing)
-The MVP proves an end-to-end batch pipeline:
-- Land raw files into an S3-style **landing zone** (MinIO).
-- Orchestrate a repeatable workflow with **Airflow** (retries/backfills).
-- Transform + model into **analytics-ready** tables with **dbt** (staging → star schema).
-- Run **data quality checks** (dbt tests) on each run.
-- Persist **run_history** (status, duration, row counts, failure reason).
