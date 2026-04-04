@@ -4,7 +4,7 @@
 
 1. **Ingestion** — Lambda drops raw source files into S3 bronze zone (partitioned paths)
 2. **Orchestration** — Step Functions state machine triggers each stage in order with retry + failure handling
-3. **ETL** — Lambda reads from S3, cleans and types the data, writes to Redshift `raw_*` and `stg_*` tables
+3. **ETL** — Lambda reads from S3, cleans and types the data, writes to RDS `raw_*` and `stg_*` tables
 4. **Modeling** — dbt builds `dim_*` and `fct_*` Gold layer tables from staging
 5. **Data quality** — dbt tests + custom Python checks validate constraints; failures written to `run_history`
 6. **Observability** — all stages emit structured logs to CloudWatch; SNS fires on any pipeline failure
