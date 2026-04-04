@@ -1,60 +1,74 @@
-## Architectural flow (what happens in order)
-1. **Batch ingestion**: source data → MinIO `raw/` prefix (partitioned paths).
-2. **Orchestration**: Airflow DAG triggers ingestion/ETL/dbt/tests and records results.
-3. **Modeling**: dbt builds `stg_*` then `dim_*` / `fct_*` tables in the warehouse.
-4. **Tests**: dbt tests validate constraints (not_null/unique/relationships).
-5. **Run history**: write run-level metrics + status for observability and debugging.
-6. **CI**: pull requests run basic checks (format/lint + dbt compile/tests as applicable).
+# Architecture
+
+## Flow
+
+1. **Ingestion** — Lambda drops raw source files into S3 bronze zone (partitioned paths)
+2. **Orchestration** — Step Functions state machine triggers each stage in order with retry + failure handling
+3. **ETL** — Lambda reads from S3, cleans and types the data, writes to RDS `raw_*` and `stg_*` tables
+4. **Modeling** — dbt builds `dim_*` and `fct_*` Gold layer tables from staging
+5. **Data quality** — dbt tests + custom Python checks validate constraints; failures written to `run_history`
+6. **Observability** — all stages emit structured logs to CloudWatch; SNS fires on any pipeline failure
+7. **Metadata** — Glue Data Catalog tracks table schemas and partitions
+8. **CI** — every push runs dbt compile + lint via GitHub Actions
+
+---
+
+## Diagram
 
 ```mermaid
 flowchart LR
-  subgraph SRC[Data Sources]
-    CSV["CSV / Files"]
-    API["External API"]
+
+  subgraph SRC[Sources]
+    FILES["Raw Files\nCSV / JSON"]
   end
 
-  subgraph LZ[Landing Zone]
-    S3["MinIO (S3-compatible)<br/>raw/bronze storage"]
+  subgraph BRONZE[S3 Landing Zone]
+    S3["S3 Bucket\nraw/year=/month=/day="]
   end
 
   subgraph ORCH[Orchestration]
-    AF["Airflow DAGs<br/>schedule, retries, backfills"]
+    SF["Step Functions\nstate machine"]
   end
 
-  subgraph PROC[Processing + Modeling]
-    ETL["Batch ETL<br/>(Python / Spark jobs)"]
-    DBT["dbt<br/>(stg -> dim/fct + tests)"]
-    DQ["Data Quality<br/>(dbt tests / Great Expectations optional)"]
+  subgraph COMPUTE[Compute]
+    L1["Lambda\nIngestion"]
+    L2["Lambda\nETL"]
+    DBT["dbt\nstg → dim / fct"]
+    DQ["Data Quality\ndbt tests + Python"]
   end
 
-  subgraph DATA[Data Stores]
-    WH["Postgres Warehouse<br/>raw_*, stg_*, dim_*, fct_*"]
-    META["Metadata DB<br/>run_history, job_status, row_counts"]
+  subgraph WAREHOUSE[RDS Postgres]
+    RAW["raw_*"]
+    STG["stg_*"]
+    GOLD["dim_* / fct_*"]
+  end
+
+  subgraph META[Metadata]
+    CATALOG["Glue Data Catalog"]
+    HISTORY["run_history\nstatus · rows · duration · failure"]
   end
 
   subgraph OBS[Observability]
-    LOGS["Structured Logs"]
-    METRICS["Run Metrics<br/>duration, rows, failures"]
+    CW["CloudWatch Logs"]
+    SNS["SNS\nfailure alert"]
   end
 
-  %% DATA PLANE (solid)
-  CSV --> S3
-  API --> S3
-  S3 -->|read raw| ETL
-  ETL -->|write raw/stg| WH
-  DBT -->|build dim/fct| WH
-  DQ -->|test results| META
-  METRICS --> META
+  FILES --> L1
+  L1 --> S3
+  S3 --> SF
 
-  %% CONTROL PLANE (dashed - Airflow triggers)
-  AF -.->|trigger ingest| S3
-  AF -.->|run ETL| ETL
-  AF -.->|run dbt| DBT
-  AF -.->|validate| DQ
+  SF --> L2
+  L2 --> RAW
+  L2 --> STG
 
-  %% logs/metrics emissions (fine as solid)
-  AF --> LOGS
-  AF --> METRICS
-  ETL --> LOGS
-  DBT --> LOGS
+  SF --> DBT
+  DBT --> GOLD
+
+  SF --> DQ
+  DQ --> HISTORY
+
+  SF --> CW
+  SF --> SNS
+
+  RAW & STG & GOLD --> CATALOG
 ```
